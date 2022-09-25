@@ -12,6 +12,9 @@
 #endif // WIN32
 #include <thread>
 
+#include <vector>
+#include <algorithm>
+
 #ifdef WIN32
 void perror(const char* msg) { fprintf(stderr, "%s %ld\n", msg, GetLastError()); }
 #endif // WIN32
@@ -44,7 +47,7 @@ struct Param {
 	}
 } param;
 
-void recvThread(int sd) {
+void recvThread(int sd, std::vector<int>& sdPool) {
 	printf("connected\n");
 	static const int BUFSIZE = 65536;
 	char buf[BUFSIZE];
@@ -66,9 +69,21 @@ void recvThread(int sd) {
 				break;
 			}
 		}
+		if (param.broadcast) {
+			for (std::vector<int>::iterator it = sdPool.begin() ; it != sdPool.end(); ++it){
+				res = ::send(*it, buf, res, 0);
+				fprintf(stdout, "%ld -> %d\n", std::this_thread::get_id(), (*it));
+				if (res == 0 || res == -1) {
+					fprintf(stderr, "send return %ld", res);
+					perror(" ");
+					break;
+				}
+			}
+		}
 	}
 	printf("disconnected\n");
 	::close(sd);
+	sdPool.erase(std::remove(sdPool.begin(), sdPool.end(), sd), sdPool.end());
 }
 
 int main(int argc, char* argv[]) {
@@ -115,6 +130,7 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
+	std::vector<int> sdPool;
 	while (true) {
 		struct sockaddr_in cli_addr;
 		socklen_t len = sizeof(cli_addr);
@@ -123,7 +139,9 @@ int main(int argc, char* argv[]) {
 			perror("accept");
 			break;
 		}
-		std::thread* t = new std::thread(recvThread, cli_sd);
+		fprintf(stdout, "add %d\n", cli_sd);
+		sdPool.push_back(cli_sd);
+		std::thread* t = new std::thread(recvThread, cli_sd, std::ref(sdPool));
 		t->detach();
 	}
 	::close(sd);
