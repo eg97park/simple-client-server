@@ -16,14 +16,16 @@
 void perror(const char* msg) { fprintf(stderr, "%s %ld\n", msg, GetLastError()); }
 #endif // WIN32
 
-void usage() {
-	printf("syntax: ts [-e] <port>\n");
+void usage(const char* arg) {
+	printf("syntax : %s <port> [-e[-b]]\n", arg);
 	printf("  -e : echo\n");
-	printf("sample: ts 1234\n");
+	printf("  -b : broadcast\n");
+	printf("sample : %s 1234 -e -b\n", arg);
 }
 
 struct Param {
 	bool echo{false};
+	bool broadcast{false};
 	uint16_t port{0};
 
 	bool parse(int argc, char* argv[]) {
@@ -32,7 +34,11 @@ struct Param {
 				echo = true;
 				continue;
 			}
-			port = atoi(argv[i++]);
+			if (strcmp(argv[i], "-b") == 0) {
+				broadcast = true;
+				continue;
+			}
+			port = atoi(argv[i]);
 		}
 		return port != 0;
 	}
@@ -67,7 +73,7 @@ void recvThread(int sd) {
 
 int main(int argc, char* argv[]) {
 	if (!param.parse(argc, argv)) {
-		usage();
+		usage(argv[0]);
 		return -1;
 	}
 

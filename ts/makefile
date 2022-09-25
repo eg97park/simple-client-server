@@ -1,5 +1,5 @@
 TARGET=../bin/ts
-CPPFLAGS+=-Wall -O2
+CPPFLAGS+=-Wall -O0 -g
 LDLIBS+=-pthread
 #LDLIBS+=-lws2_32 # for mingw
 
