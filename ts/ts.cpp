@@ -14,10 +14,13 @@
 
 #include <vector>
 #include <algorithm>
+#include <mutex>
 
 #ifdef WIN32
 void perror(const char* msg) { fprintf(stderr, "%s %ld\n", msg, GetLastError()); }
 #endif // WIN32
+
+static std::mutex g_sdPool_mutex;
 
 void usage(const char* arg) {
 	printf("syntax : %s <port> [-e[-b]]\n", arg);
@@ -70,6 +73,7 @@ void recvThread(int sd, std::vector<int>& sdPool) {
 			}
 		}
 		if (param.broadcast) {
+g_sdPool_mutex.lock();
 			for (std::vector<int>::iterator it = sdPool.begin() ; it != sdPool.end(); ++it){
 				res = ::send(*it, buf, res, 0);
 				fprintf(stdout, "%ld -> %d\n", std::this_thread::get_id(), (*it));
@@ -79,11 +83,14 @@ void recvThread(int sd, std::vector<int>& sdPool) {
 					break;
 				}
 			}
+g_sdPool_mutex.unlock();
 		}
 	}
 	printf("disconnected\n");
 	::close(sd);
+g_sdPool_mutex.lock();
 	sdPool.erase(std::remove(sdPool.begin(), sdPool.end(), sd), sdPool.end());
+g_sdPool_mutex.unlock();
 }
 
 int main(int argc, char* argv[]) {
@@ -140,8 +147,10 @@ int main(int argc, char* argv[]) {
 			break;
 		}
 		fprintf(stdout, "add %d\n", cli_sd);
+g_sdPool_mutex.lock();
 		sdPool.push_back(cli_sd);
 		std::thread* t = new std::thread(recvThread, cli_sd, std::ref(sdPool));
+g_sdPool_mutex.unlock();
 		t->detach();
 	}
 	::close(sd);
